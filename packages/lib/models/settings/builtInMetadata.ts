@@ -10,7 +10,7 @@ import type { PluginSettings } from '../../services/plugins/PluginService';
 import type { PublicPrivateKeyPair } from '../../services/e2ee/ppk/ppk';
 import { EmptyObject } from '@joplin/utils/types';
 const ObjectUtils = require('../../ObjectUtils');
-const { toTitleCase } = require('../../string-utils.js');
+import { toTitleCase } from '../../string-utils';
 
 const customCssFilePath = (Setting: typeof SettingType, filename: string): string => {
 	return `${Setting.value('rootProfileDir')}/${filename}`;
@@ -21,6 +21,10 @@ const showVoiceTypingSettings = (settings: VoiceTypingSettingSlice) => (
 	// For now, iOS and web don't support voice typing.
 	shim.mobilePlatform() === 'android' && !!settings['buildFlag.voiceTypingEnabled']
 );
+
+const show3rdPartySyncSettings = (Setting: typeof SettingType) => {
+	return !Setting.value('isJoplinCloudWebApp');
+};
 
 export enum CameraDirection {
 	Back,
@@ -62,8 +66,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 	// public for the mobile and desktop apps because they are handled separately in menus.
 
 	const themeOptions = () => {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-		const output: any = {};
+		const output: Record<number, string> = {};
 		output[Setting.THEME_LIGHT] = _('Light');
 		output[Setting.THEME_DARK] = _('Dark');
 		output[Setting.THEME_DRACULA] = _('Dracula');
@@ -131,7 +134,12 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 				return appType !== 'cli' ? null : _('The target to synchronise to. Each sync target may have additional parameters which are named as `sync.NUM.NAME` (all documented below).');
 			},
 			options: () => {
-				return SyncTargetRegistry.idAndLabelPlainObject(platform);
+				if (show3rdPartySyncSettings(Setting)) {
+					return SyncTargetRegistry.idAndLabelPlainObject(platform);
+				} else {
+					// Only the Joplin-related sync targets are shown on app.joplincloud.com:
+					return SyncTargetRegistry.idAndLabelPlainObject(platform, ['0', '10']);
+				}
 			},
 			optionsOrder: () => {
 				return SyncTargetRegistry.optionsOrder();
@@ -155,17 +163,15 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: '',
 			type: SettingItemType.String,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				try {
 					return settings['sync.target'] === SyncTargetRegistry.nameToId('filesystem');
 				} catch (error) {
 					return false;
 				}
 			},
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			filter: (value: any) => {
-				return value ? rtrimSlashes(value) : '';
+			filter: value => {
+				return value ? rtrimSlashes(value as string) : '';
 			},
 			public: true,
 			label: () => _('Directory to synchronise with (absolute path)'),
@@ -177,8 +183,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: '',
 			type: SettingItemType.String,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return settings['sync.target'] === SyncTargetRegistry.nameToId('nextcloud');
 			},
 			public: true,
@@ -190,8 +195,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: '',
 			type: SettingItemType.String,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return settings['sync.target'] === SyncTargetRegistry.nameToId('nextcloud');
 			},
 			public: true,
@@ -202,8 +206,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: '',
 			type: SettingItemType.String,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return settings['sync.target'] === SyncTargetRegistry.nameToId('nextcloud');
 			},
 			public: true,
@@ -215,8 +218,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: '',
 			type: SettingItemType.String,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return settings['sync.target'] === SyncTargetRegistry.nameToId('webdav');
 			},
 			public: true,
@@ -228,8 +230,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: '',
 			type: SettingItemType.String,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return settings['sync.target'] === SyncTargetRegistry.nameToId('webdav');
 			},
 			public: true,
@@ -240,8 +241,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: '',
 			type: SettingItemType.String,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return settings['sync.target'] === SyncTargetRegistry.nameToId('webdav');
 			},
 			public: true,
@@ -253,8 +253,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: '',
 			type: SettingItemType.String,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				try {
 					return settings['sync.target'] === SyncTargetRegistry.nameToId('amazon_s3');
 				} catch (error) {
@@ -273,8 +272,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: 'https://s3.amazonaws.com/',
 			type: SettingItemType.String,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return settings['sync.target'] === SyncTargetRegistry.nameToId('amazon_s3');
 			},
 			filter: value => {
@@ -288,8 +286,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: '',
 			type: SettingItemType.String,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return settings['sync.target'] === SyncTargetRegistry.nameToId('amazon_s3');
 			},
 			filter: value => {
@@ -303,8 +300,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: '',
 			type: SettingItemType.String,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return settings['sync.target'] === SyncTargetRegistry.nameToId('amazon_s3');
 			},
 			public: true,
@@ -315,8 +311,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: '',
 			type: SettingItemType.String,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return settings['sync.target'] === SyncTargetRegistry.nameToId('amazon_s3');
 			},
 			public: true,
@@ -327,8 +322,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: false,
 			type: SettingItemType.Bool,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return settings['sync.target'] === SyncTargetRegistry.nameToId('amazon_s3');
 			},
 			public: true,
@@ -339,8 +333,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: '',
 			type: SettingItemType.String,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return settings['sync.target'] === SyncTargetRegistry.nameToId('joplinServer');
 			},
 			public: true,
@@ -358,8 +351,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: '',
 			type: SettingItemType.String,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return settings['sync.target'] === SyncTargetRegistry.nameToId('joplinServer');
 			},
 			public: true,
@@ -370,8 +362,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: '',
 			type: SettingItemType.String,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return settings['sync.target'] === SyncTargetRegistry.nameToId('joplinServer');
 			},
 			public: true,
@@ -382,8 +373,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			value: '',
 			type: SettingItemType.String,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return settings['sync.target'] === SyncTargetRegistry.nameToId('joplinServerSaml');
 			},
 			public: true,
@@ -444,6 +434,8 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			public: false,
 			secure: true,
 		},
+
+		'sync.10.pendingAuthId': { value: '', type: SettingItemType.String, public: false },
 
 		'sync.10.inboxEmail': { value: '', type: SettingItemType.String, public: false },
 
@@ -533,8 +525,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			public: true,
 			label: () => _('Date format'),
 			options: () => {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-				const options: any = {};
+				const options: Record<string, string> = {};
 				const now = new Date('2017-01-30T12:00:00').getTime();
 				options[Setting.DATE_FORMAT_1] = time.formatMsToLocal(now, Setting.DATE_FORMAT_1);
 				options[Setting.DATE_FORMAT_2] = time.formatMsToLocal(now, Setting.DATE_FORMAT_2);
@@ -557,8 +548,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			public: true,
 			label: () => _('Time format'),
 			options: () => {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-				const options: any = {};
+				const options: Record<string, string> = {};
 				const now = new Date('2017-01-30T20:30:00').getTime();
 				options[Setting.TIME_FORMAT_1] = time.formatMsToLocal(now, Setting.TIME_FORMAT_1);
 				options[Setting.TIME_FORMAT_2] = time.formatMsToLocal(now, Setting.TIME_FORMAT_2);
@@ -644,6 +634,329 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			appTypes: [AppType.Desktop],
 			storage: SettingStorage.Database,
 			label: () => _('OCR: Search in extracted content'),
+		},
+
+		'ai.enabled': {
+			value: false,
+			type: SettingItemType.Bool,
+			public: true,
+			section: 'ai',
+			appTypes: [AppType.Desktop],
+			label: () => _('Enable AI features'),
+			description: () => _('When enabled, plugins and built-in features can use AI models to generate or analyse text. AI is off by default.'),
+			storage: SettingStorage.File,
+		},
+
+		'ai.allowRemote': {
+			value: false,
+			type: SettingItemType.Bool,
+			public: true,
+			section: 'ai',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['ai.enabled'],
+			label: () => _('Allow remote AI providers'),
+			description: () => _('Required to use cloud-hosted AI models, including Joplin Cloud AI. When disabled, only on-device providers can be used.'),
+			storage: SettingStorage.File,
+		},
+
+		'ai.chat.providerType': {
+			value: 'openai-compatible',
+			type: SettingItemType.String,
+			isEnum: true,
+			public: true,
+			section: 'ai',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['ai.enabled'],
+			label: () => _('Chat provider'),
+			description: () => {
+				// Inline warning when Joplin Cloud AI is selected but the user is
+				// no longer syncing with Joplin Cloud — the provider call will
+				// fail until they either restore Cloud sync or pick another
+				// provider.
+				if (Setting.value('ai.chat.providerType') === 'joplin-cloud' && Setting.value('sync.target') !== 10) {
+					return _('Joplin Cloud AI requires Joplin Cloud sync. Pick a different provider or restore Joplin Cloud sync.');
+				}
+				return '';
+			},
+			options: () => ({
+				'joplin-cloud': _('Joplin Cloud AI (beta)'),
+				'openai-compatible': _('OpenAI-compatible'),
+				'anthropic': _('Anthropic'),
+			}),
+			storage: SettingStorage.File,
+		},
+
+		// Tracks whether the user has made an explicit chat-provider choice.
+		// On the first false→true transition of `ai.enabled`, AiService writes
+		// the sync-aware default for `ai.chat.providerType` and flips this to
+		// true. After that, sync target changes do not affect the provider.
+		'ai.chat.providerType.configured': {
+			value: false,
+			type: SettingItemType.Bool,
+			public: false,
+			appTypes: [AppType.Desktop],
+			storage: SettingStorage.Database,
+		},
+
+		'ai.chat.baseUrl': {
+			value: '',
+			type: SettingItemType.String,
+			public: true,
+			section: 'ai',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['ai.enabled'] && settings['ai.chat.providerType'] === 'openai-compatible',
+			label: () => _('Base URL'),
+			description: () => _('The OpenAI-compatible API endpoint. For example, https://api.openai.com/v1 or http://localhost:11434/v1 for Ollama.'),
+			storage: SettingStorage.File,
+		},
+
+		'ai.chat.apiKey': {
+			value: '',
+			type: SettingItemType.String,
+			secure: true,
+			public: true,
+			section: 'ai',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['ai.enabled'] && (settings['ai.chat.providerType'] === 'openai-compatible' || settings['ai.chat.providerType'] === 'anthropic'),
+			label: () => _('API key'),
+			storage: SettingStorage.Database,
+		},
+
+		'ai.chat.model': {
+			value: '',
+			type: SettingItemType.String,
+			public: true,
+			section: 'ai',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['ai.enabled'] && (settings['ai.chat.providerType'] === 'openai-compatible' || settings['ai.chat.providerType'] === 'anthropic'),
+			label: () => _('Model'),
+			description: () => _('The model identifier to use, for example gpt-4o-mini or claude-3-5-sonnet-latest.'),
+			storage: SettingStorage.File,
+		},
+
+		// Cumulative token counters for the currently configured provider.
+		// Reset whenever the user changes the active provider in settings —
+		// totals always reflect the provider in use.
+		'ai.usage.inputTokens': {
+			value: 0,
+			type: SettingItemType.Int,
+			public: false,
+			appTypes: [AppType.Desktop],
+			storage: SettingStorage.Database,
+		},
+
+		'ai.usage.outputTokens': {
+			value: 0,
+			type: SettingItemType.Int,
+			public: false,
+			appTypes: [AppType.Desktop],
+			storage: SettingStorage.Database,
+		},
+
+		'ai.usage.resetButton': {
+			value: null as null,
+			type: SettingItemType.Button,
+			public: true,
+			section: 'ai',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['ai.enabled'],
+			label: () => _('Reset token usage'),
+			description: () => {
+				const inTokens = Setting.value('ai.usage.inputTokens') as number;
+				const outTokens = Setting.value('ai.usage.outputTokens') as number;
+				if (inTokens === 0 && outTokens === 0) return _('No AI usage recorded yet.');
+				return _('%s input / %s output tokens used.', inTokens.toLocaleString(), outTokens.toLocaleString());
+			},
+		},
+
+		'ai.chat.testButton': {
+			value: null as null,
+			type: SettingItemType.Button,
+			public: true,
+			section: 'ai',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['ai.enabled'],
+			label: () => _('Test AI configuration'),
+		},
+
+		// First-send disclosure for non-cloud providers. The chat panel shows
+		// an inline banner the first time the user sends a message; clicking
+		// "Don't show again" flips this so the banner stays away.
+		'ai.chat.disclosureAcknowledged': {
+			value: false,
+			type: SettingItemType.Bool,
+			public: false,
+			appTypes: [AppType.Desktop],
+			storage: SettingStorage.Database,
+		},
+
+		// User toggle for the background embedding indexer. On by default —
+		// when AI is enabled, indexing is part of what AI does. The toggle
+		// exists as a kill switch for users who want chat without the
+		// background CPU cost of indexing.
+		'ai.embedding.enabled': {
+			value: true,
+			type: SettingItemType.Bool,
+			public: true,
+			section: 'ai',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['ai.enabled'],
+			label: () => _('Index notes for AI search'),
+			storage: SettingStorage.File,
+			isGlobal: true,
+		},
+
+		// Embedding indexer state. Hidden internal cursors — no UI surface.
+		// `lastProcessedChangeId` is the ItemChange cursor the indexer
+		// resumes from on each maintenance tick. `lastIndexedModelId` lets us
+		// detect when the active embedding model has changed (mismatch →
+		// full re-index, since vectors from different models aren't
+		// comparable).
+		'ai.embedding.lastProcessedChangeId': {
+			value: 0,
+			type: SettingItemType.Int,
+			public: false,
+			appTypes: [AppType.Desktop],
+			storage: SettingStorage.Database,
+		},
+		'ai.embedding.lastIndexedModelId': {
+			value: '',
+			type: SettingItemType.String,
+			public: false,
+			appTypes: [AppType.Desktop],
+			storage: SettingStorage.Database,
+		},
+
+		// Indexer lifecycle: false until the initial full-vault scan finishes;
+		// after that the indexer only follows the ItemChange feed. Reset to
+		// false when the model id changes (triggering a re-scan).
+		'ai.embedding.initialScanDone': {
+			value: false,
+			type: SettingItemType.Bool,
+			public: false,
+			appTypes: [AppType.Desktop],
+			storage: SettingStorage.Database,
+		},
+
+		'mcp.enabled': {
+			value: false,
+			type: SettingItemType.Bool,
+			public: true,
+			section: 'mcp',
+			appTypes: [AppType.Desktop],
+			label: () => _('Enable MCP server'),
+			description: () => _('Exposes Joplin notes to external AI applications (Claude Desktop, Cursor, etc.) via the Model Context Protocol. Requires the Web Clipper service to be running. Connected AI tools can read your note content; any text they retrieve may be sent to the external LLM provider those tools use.'),
+			storage: SettingStorage.File,
+		},
+
+		'mcp.tool.search_notes.enabled': {
+			value: true,
+			type: SettingItemType.Bool,
+			public: true,
+			section: 'mcp',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['mcp.enabled'],
+			label: () => _('MCP: Allow searching notes'),
+			storage: SettingStorage.File,
+		},
+
+		'mcp.tool.read_note.enabled': {
+			value: true,
+			type: SettingItemType.Bool,
+			public: true,
+			section: 'mcp',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['mcp.enabled'],
+			label: () => _('MCP: Allow reading notes'),
+			storage: SettingStorage.File,
+		},
+
+		'mcp.tool.list_notebooks.enabled': {
+			value: true,
+			type: SettingItemType.Bool,
+			public: true,
+			section: 'mcp',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['mcp.enabled'],
+			label: () => _('MCP: Allow listing notebooks'),
+			storage: SettingStorage.File,
+		},
+
+		'mcp.tool.list_tags.enabled': {
+			value: true,
+			type: SettingItemType.Bool,
+			public: true,
+			section: 'mcp',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['mcp.enabled'],
+			label: () => _('MCP: Allow listing tags'),
+			storage: SettingStorage.File,
+		},
+
+		'mcp.tool.create_note.enabled': {
+			value: false,
+			type: SettingItemType.Bool,
+			public: true,
+			section: 'mcp',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['mcp.enabled'],
+			label: () => _('MCP: Allow creating notes'),
+			storage: SettingStorage.File,
+		},
+
+		'mcp.tool.update_note.enabled': {
+			value: false,
+			type: SettingItemType.Bool,
+			public: true,
+			section: 'mcp',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['mcp.enabled'],
+			label: () => _('MCP: Allow updating notes'),
+			storage: SettingStorage.File,
+		},
+
+		'mcp.tool.delete_note.enabled': {
+			value: false,
+			type: SettingItemType.Bool,
+			public: true,
+			section: 'mcp',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['mcp.enabled'],
+			label: () => _('MCP: Allow trashing notes'),
+			storage: SettingStorage.File,
+		},
+
+		'mcp.tool.manage_tags.enabled': {
+			value: false,
+			type: SettingItemType.Bool,
+			public: true,
+			section: 'mcp',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['mcp.enabled'],
+			label: () => _('MCP: Allow editing tags on notes'),
+			storage: SettingStorage.File,
+		},
+
+		'mcp.tool.create_notebook.enabled': {
+			value: false,
+			type: SettingItemType.Bool,
+			public: true,
+			section: 'mcp',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['mcp.enabled'],
+			label: () => _('MCP: Allow creating notebooks'),
+			storage: SettingStorage.File,
+		},
+
+		'mcp.tool.semantic_search_notes.enabled': {
+			value: true,
+			type: SettingItemType.Bool,
+			public: true,
+			section: 'mcp',
+			appTypes: [AppType.Desktop],
+			show: (settings) => !!settings['mcp.enabled'],
+			label: () => _('MCP: Allow semantic search of notes'),
+			storage: SettingStorage.File,
 		},
 
 		theme: {
@@ -741,8 +1054,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			options: () => {
 				const Note = require('../Note').default;
 				const noteSortFields = ['user_updated_time', 'user_created_time', 'title', 'order', 'todo_due', 'todo_completed'];
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-				const options: any = {};
+				const options: Record<string, string> = {};
 				for (let i = 0; i < noteSortFields.length; i++) {
 					options[noteSortFields[i]] = toTitleCase(Note.fieldToLabel(noteSortFields[i]));
 				}
@@ -895,8 +1207,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			appTypes: [AppType.Cli, AppType.Desktop, AppType.Mobile],
 		},
 		'notes.sharedSortOrder': {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Partially refactored old code from before rule was applied.
-			value: {} as Record<string, any>,
+			value: {} as Record<string, unknown>,
 			type: SettingItemType.Object,
 			section: 'folder',
 			public: false,
@@ -913,8 +1224,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			options: () => {
 				const Folder = require('../Folder').default;
 				const folderSortFields = ['title', 'last_note_user_updated_time'];
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-				const options: any = {};
+				const options: Record<string, string> = {};
 				for (let i = 0; i < folderSortFields.length; i++) {
 					options[folderSortFields[i]] = toTitleCase(Folder.fieldToLabel(folderSortFields[i]));
 				}
@@ -1152,7 +1462,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 		'markdown.plugin.emoji': { storage: SettingStorage.File, isGlobal: true, value: false, type: SettingItemType.Bool, section: 'markdownPlugins', public: true, appTypes: [AppType.Mobile, AppType.Desktop], label: () => `${_('Enable markdown emoji')}${wysiwygNo}` },
 		'markdown.plugin.insert': { storage: SettingStorage.File, isGlobal: true, value: false, type: SettingItemType.Bool, section: 'markdownPlugins', public: true, appTypes: [AppType.Mobile, AppType.Desktop], label: () => `${_('Enable ++insert++ syntax')}${wysiwygYes}` },
 		'markdown.plugin.multitable': { storage: SettingStorage.File, isGlobal: true, value: false, type: SettingItemType.Bool, section: 'markdownPlugins', public: true, appTypes: [AppType.Mobile, AppType.Desktop], label: () => `${_('Enable multimarkdown table extension')}${wysiwygNo}` },
-		'markdown.plugin.externalEmbed': { storage: SettingStorage.File, isGlobal: true, value: true, type: SettingItemType.Bool, section: 'markdownPlugins', public: true, appTypes: [AppType.Mobile, AppType.Desktop], label: () => `${_('Enable external embeds (e.g. YouTube Videos)')}${wysiwygYes}` },
+		'markdown.plugin.externalEmbed': { storage: SettingStorage.File, isGlobal: true, value: true, type: SettingItemType.Bool, section: 'markdownPlugins', public: true, appTypes: [AppType.Desktop], label: () => `${_('Enable external embeds (e.g. YouTube Videos)')}${wysiwygYes}` },
 
 		// For now, applies only to the Markdown viewer
 		'renderer.fileUrls': {
@@ -1318,6 +1628,23 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 					isGlobal: true,
 					subType: SettingItemSubType.FontFamily,
 				},
+		'editor.mobile.defaultEditState': {
+			value: 'view',
+			type: SettingItemType.String,
+			isEnum: true,
+			section: 'editor',
+			public: true,
+			appTypes: [AppType.Mobile],
+			label: () => _('Default view / edit state'),
+			options: () => {
+				return {
+					view: _('View mode'),
+					edit: _('Edit mode'),
+					last: _('Last used'),
+				};
+			},
+			storage: SettingStorage.File,
+		},
 		'style.editor.monospaceFontFamily': {
 			value: '',
 			type: SettingItemType.String,
@@ -1538,8 +1865,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			advanced: true,
 			label: () => _('Keyboard Mode'),
 			options: () => {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-				const output: any = {};
+				const output: Record<string, string> = {};
 				output[''] = _('Default');
 				output['emacs'] = _('Emacs');
 				output['vim'] = _('Vim');
@@ -1667,8 +1993,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			type: SettingItemType.String,
 			section: 'sync',
 			advanced: true,
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return [
 					SyncTargetRegistry.nameToId('amazon_s3'),
 					SyncTargetRegistry.nameToId('nextcloud'),
@@ -1687,8 +2012,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			type: SettingItemType.Bool,
 			advanced: true,
 			section: 'sync',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => {
+			show: settings => {
 				return (shim.isNode() || shim.mobilePlatform() === 'android') &&
 					[
 						SyncTargetRegistry.nameToId('amazon_s3'),
@@ -1929,6 +2253,20 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			appTypes: [AppType.Mobile],
 		},
 
+		'featureFlag.noteLock': {
+			value: false,
+			type: SettingItemType.Bool,
+			public: false,
+			storage: SettingStorage.File,
+		},
+
+		'noteLock.lockOnNoteSwitch': {
+			value: false,
+			type: SettingItemType.Bool,
+			public: false,
+			storage: SettingStorage.File,
+		},
+
 		'featureFlag.autoUpdaterServiceEnabled': {
 			value: false,
 			type: SettingItemType.Bool,
@@ -2120,8 +2458,7 @@ const builtInMetadata = (Setting: typeof SettingType) => {
 			unitLabel: (value: number = null) => {
 				return value === null ? _('days') : _n('%d day', '%d days', value, value);
 			},
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-			show: (settings: any) => settings['trash.autoDeletionEnabled'],
+			show: settings => !!settings['trash.autoDeletionEnabled'],
 			label: () => _('Keep notes in the trash for'),
 			storage: SettingStorage.File,
 			isGlobal: false,

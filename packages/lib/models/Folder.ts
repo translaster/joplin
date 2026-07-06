@@ -1,6 +1,6 @@
 import { BaseItemEntity, defaultFolderIcon, FolderEntity, FolderIcon, NoteEntity, ResourceEntity } from '../services/database/types';
 import BaseModel, { DeleteOptions, ModelType } from '../BaseModel';
-import { FolderLoadOptions } from './utils/types';
+import { FolderLoadOptions, SaveOptions } from './utils/types';
 import time from '../time';
 import { _ } from '../locale';
 import Note from './Note';
@@ -21,7 +21,7 @@ import { getCollator } from './utils/getCollator';
 import Setting from './Setting';
 import { itemIsReadOnlySync, ItemSlice } from './utils/readOnly';
 import ItemChange from './ItemChange';
-const { substrWithEllipsis } = require('../string-utils.js');
+import { substrWithEllipsis } from '../string-utils';
 
 const logger = Logger.create('models/Folder');
 
@@ -50,8 +50,7 @@ export default class Folder extends BaseItem {
 	}
 
 	public static fieldToLabel(field: string) {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-		const fieldsToLabels: any = {
+		const fieldsToLabels: Record<string, string> = {
 			title: _('title'),
 			last_note_user_updated_time: _('updated date'),
 		};
@@ -95,6 +94,20 @@ export default class Folder extends BaseItem {
 		return r ? r.total : 0;
 	}
 
+	// Returns a map of folder id → number of indexable notes (excluding trash
+	// and conflicts). Folders with zero notes are omitted from the map.
+	public static async noteCountsByFolderId() {
+		const rows = await this.db().selectAll<{ parent_id: string; total: number }>(
+			`SELECT parent_id, count(*) as total
+			 FROM notes
+			 WHERE is_conflict = 0 AND (deleted_time IS NULL OR deleted_time = 0)
+			 GROUP BY parent_id`,
+		);
+		const counts: Record<string, number> = {};
+		for (const r of rows) counts[r.parent_id] = r.total;
+		return counts;
+	}
+
 	public static markNotesAsConflict(parentId: string) {
 		const query = Database.updateQuery('notes', { is_conflict: 1 }, { parent_id: parentId });
 		return this.db().exec(query);
@@ -106,8 +119,7 @@ export default class Folder extends BaseItem {
 	}
 
 	public static async deleteAllByShareId(shareId: string, deleteOptions: DeleteOptions = null) {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-		const tableNameToClasses: Record<string, any> = {
+		const tableNameToClasses: Record<string, typeof BaseItem> = {
 			'folders': Folder,
 			'notes': Note,
 			'resources': Resource,
@@ -349,8 +361,7 @@ export default class Folder extends BaseItem {
 		return output;
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-	public static handleTitleNaturalSorting(items: FolderEntity[], options: any) {
+	public static handleTitleNaturalSorting(items: FolderEntity[], options: { order?: { by: string; dir: string }[] }) {
 		if (options.order?.length > 0 && options.order[0].by === 'title') {
 			const collator = getCollator();
 			items.sort((a, b) => ((options.order[0].dir === 'ASC') ? 1 : -1) * collator.compare(a.title, b.title));
@@ -775,15 +786,13 @@ export default class Folder extends BaseItem {
 	// Clear the "share_id" property for the items that are associated with a
 	// share that no longer exists.
 	public static async updateNoLongerSharedItems(activeShareIds: string[]) {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-		const tableNameToClasses: Record<string, any> = {
+		const tableNameToClasses: Record<string, typeof BaseItem> = {
 			'folders': Folder,
 			'notes': Note,
 			'resources': Resource,
 		};
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-		const report: any = {};
+		const report: Record<string, number> = {};
 
 		for (const tableName of ['folders', 'notes', 'resources']) {
 			const ItemClass = tableNameToClasses[tableName];
@@ -825,8 +834,7 @@ export default class Folder extends BaseItem {
 		logger.debug('updateNoLongerSharedItems:', report);
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-	public static async allAsTree(folders: FolderEntity[] = null, options: any = null) {
+	public static async allAsTree(folders: FolderEntity[] = null, options: FolderLoadOptions & { includeNotes?: boolean } = null) {
 		interface FolderWithNotes extends FolderEntity {
 			notes?: NoteEntity[];
 		}
@@ -905,8 +913,7 @@ export default class Folder extends BaseItem {
 	}
 
 	public static buildTree(folders: FolderEntity[]): FolderEntityWithChildren[] {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-		const idToFolders: Record<string, any> = {};
+		const idToFolders: Record<string, FolderEntityWithChildren> = {};
 		for (let i = 0; i < folders.length; i++) {
 			idToFolders[folders[i].id] = { ...folders[i] };
 			idToFolders[folders[i].id].children = [];
@@ -1031,8 +1038,7 @@ export default class Folder extends BaseItem {
 	// manually creating a folder. They shouldn't be done for example when the folders
 	// are being synced to avoid any strange side-effects. Technically it's possible to
 	// have folders and notes with duplicate titles (or no title), or with reserved words.
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
-	public static async save(o: FolderEntity, options: any = null) {
+	public static async save(o: FolderEntity, options: SaveOptions & { duplicateCheck?: boolean; reservedTitleCheck?: boolean; stripLeftSlashes?: boolean } = null) {
 		if (!options) options = {};
 
 		if (options.userSideValidation === true) {

@@ -163,6 +163,7 @@ describe('screens/Note', () => {
 		await setupDatabaseAndSynchronizer(1);
 		await setupDatabaseAndSynchronizer(0);
 		await switchClient(0);
+		Setting.setValue('editor.mobile.defaultEditState', 'view');
 
 		store = createMockReduxStore();
 		setupGlobalStore(store);
@@ -377,13 +378,15 @@ describe('screens/Note', () => {
 	it.each([
 		[['viewer']],
 		[['editor']],
-	])('should initialize in the correct mode when noteVisiblePanes is %j', async (panes) => {
+	])('should initialize in the correct mode when noteVisiblePanes is %j, when default edit state is set to last', async (panes) => {
+		Setting.setValue('editor.mobile.defaultEditState', 'last');
 		const { unmount } = await setupNoteWithPanes(panes);
 		await expectToBeEditing(panes.includes('editor'));
 		unmount();
 	});
 
-	it('should show edit button', async () => {
+	it('should show edit button when in view mode', async () => {
+		Setting.setValue('editor.mobile.defaultEditState', 'last');
 		const { unmount } = await setupNoteWithPanes(['viewer']);
 		const editButton = await screen.findByLabelText('Edit');
 		expect(editButton).toBeVisible();
@@ -393,7 +396,8 @@ describe('screens/Note', () => {
 	it.each([
 		[['viewer']],
 		[['editor']],
-	])('should switch modes when toggle button is pressed', async (panes) => {
+	])('should switch modes when toggle button is pressed, when default edit state is set to last', async (panes) => {
+		Setting.setValue('editor.mobile.defaultEditState', 'last');
 		const initialEditing = panes.includes('editor');
 		const expectedEditing = !initialEditing;
 		const { unmount } = await setupNoteWithPanes(panes);
@@ -450,7 +454,9 @@ describe('screens/Note', () => {
 	it.each([
 		[['viewer']],
 		[['editor']],
-	])('should preserve noteVisiblePanes state when leaving and returning to the same note', async (panes) => {
+	])('should preserve noteVisiblePanes state when leaving and returning to the same note, when default edit state is set to last', async (panes) => {
+		Setting.setValue('editor.mobile.defaultEditState', 'last');
+
 		const firstRender = await setupNoteWithPanes(panes);
 		await expectToBeEditing(panes.includes('editor'));
 		// Navigate away
@@ -480,7 +486,9 @@ describe('screens/Note', () => {
 	it.each([
 		[['viewer']],
 		[['editor']],
-	])('should preserve noteVisiblePanes state when navigating from note 1 to note 2', async (panes) => {
+	])('should preserve noteVisiblePanes state when navigating from note 1 to note 2, when default edit state is set to last', async (panes) => {
+		Setting.setValue('editor.mobile.defaultEditState', 'last');
+
 		// Open note 1
 		await act(async () => {
 			store.dispatch({
@@ -511,6 +519,55 @@ describe('screens/Note', () => {
 		await expectToBeEditing(panes.includes('editor'));
 		expect(store.getState().noteVisiblePanes).toEqual(panes);
 		unmount();
+	});
+
+	// Regression test: when a provisional note has no title, saving derives the
+	// title from the body. The provisional-note branch of saveNoteButton_press
+	// also kicks off a background geolocation update; that callback used to
+	// close over a stale `state.note` (captured before the title was derived)
+	// and wipe the derived title back to empty when it resolved.
+	it('should not clear the auto-derived title when the background geolocation update resolves', async () => {
+		Setting.setValue('trackLocation', true);
+
+		const originalGeolocation = shim.Geolocation;
+		let resolveGeoloc: (v: unknown)=> void = () => {};
+		shim.Geolocation = {
+			currentPosition: () => new Promise(resolve => { resolveGeoloc = resolve; }),
+		};
+
+		let unmount = () => {};
+		try {
+			const noteId = await openNewNote({ title: '', body: '' });
+			store.dispatch({
+				type: 'NOTE_UPDATE_ONE',
+				note: await Note.load(noteId),
+				provisional: true,
+			});
+
+			({ unmount } = render(<WrappedNoteScreen />));
+			const editor = await getMarkdownEditorControl();
+
+			await act(async () => {
+				editor.insertText('Derived from body');
+			});
+
+			await screen.findByDisplayValue('Derived from body');
+
+			await act(async () => {
+				resolveGeoloc({ timestamp: Date.now(), coords: { latitude: 1, longitude: 2, altitude: 3 } });
+			});
+			await waitForNoteToMatch(noteId, { title: 'Derived from body' });
+			await waitFor(async () => {
+				const loaded = await Note.load(noteId);
+				expect(Number(loaded.latitude)).toBe(1);
+			});
+
+			expect(screen.getByDisplayValue('Derived from body')).toBeVisible();
+		} finally {
+			unmount();
+			shim.Geolocation = originalGeolocation;
+			Setting.setValue('trackLocation', false);
+		}
 	});
 
 	it('should set the initial editor cursor location to the specified hash', async () => {
